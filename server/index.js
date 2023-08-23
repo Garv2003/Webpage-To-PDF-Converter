@@ -3,15 +3,20 @@ const mongoose = require("mongoose");
 const cors = require("cors");
 const axios = require("axios");
 const { PDFDocument, rgb } = require("pdf-lib");
+const puppeteer = require("puppeteer");
+const fs = require("fs");
+const path = require("path");
+const validUrl = require("valid-url"); // You may need to install this package
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-mongoose.connect("mongodb://your_database_url", {
+mongoose.connect("mongodb://127.0.0.1:27017/pdf", {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 });
-const PdfModel = mongoose.model("Pdf", { data: Buffer });
+
+const PdfModel = mongoose.model("Pdf", { path: String });
 
 app.use(express.json());
 app.use(cors());
@@ -19,26 +24,27 @@ app.use(cors());
 app.post("/convert", async (req, res) => {
   const { url } = req.body;
 
+  // Validate the URL
+  if (!validUrl.isUri(url)) {
+    return res.status(400).json({ success: false, message: "Invalid URL." });
+  }
+
   try {
-    const response = await axios.get(url);
-    const html = response.data;
-    const pdfDoc = await PDFDocument.create();
-    const page = pdfDoc.addPage([600, 800]);
-    const { width, height } = page.getSize();
-    // Embed the HTML content into the PDF
-    const { data } = await page.drawText(html, {
-      x: 10,
-      y: height - 30,
-      size: 12,
-      color: rgb(0, 0, 0),
-    });
-    // Serialize the PDF
-    const pdfBytes = await pdfDoc.save();
-    console.log(pdfBytes);
-    // // Save the PDF to the database
-    const pdfModel = new PdfModel({ data: pdfBytes });
+    const browser = await puppeteer.launch({ headless: "new" });
+    const page = await browser.newPage();
+    await page.goto(url, { waitUntil: "networkidle2" });
+    // Generate the PDF from the webpage
+    const pdfBuffer = await page.pdf();
+    // Close the browser
+    await browser.close();
+    // Define the path where you want to save the PDF file on the server
+    const pdfPath = path.join(__dirname, "pdfs", `${Date.now()}.pdf`); // Assuming a 'pdfs' directory
+    // Save the PDF file to the server
+    fs.writeFileSync(pdfPath, pdfBuffer);
+    // Store the file path in the database
+    const pdfModel = new PdfModel({ path: pdfPath });
     await pdfModel.save();
-    // // Construct the PDF download URL
+    // Construct the PDF download URL
     const pdfUrl = `/pdfs/${pdfModel._id}`;
     res.json({
       success: true,
@@ -53,19 +59,26 @@ app.post("/convert", async (req, res) => {
   }
 });
 
-app.get("/pdfs/:id", async (req, res) => {
+app.get("/pdfs/:id/download", async (req, res) => {
   const { id } = req.params;
+
   try {
-    const pdfDoc = await PdfModel.findById(id);
-    if (!pdfDoc) {
+    const pdfModel = await PdfModel.findById(id);
+    if (!pdfModel) {
       return res
         .status(404)
         .json({ success: false, message: "PDF not found." });
     }
-    // Send the PDF as a download
-    res.set("Content-Type", "application/pdf");
-    res.set("Content-Disposition", 'attachment; filename="converted.pdf"');
-    res.send(pdfDoc.data);
+
+    const pdfPath = pdfModel.path;
+
+    // Set the response headers for downloading
+    res.setHeader("Content-Disposition", `attachment; filename=converted.pdf`);
+    res.setHeader("Content-Type", "application/pdf");
+
+    // Send the PDF file as a stream
+    const stream = fs.createReadStream(pdfPath);
+    stream.pipe(res);
   } catch (error) {
     console.error(error);
     res
@@ -73,7 +86,6 @@ app.get("/pdfs/:id", async (req, res) => {
       .json({ success: false, message: "Failed to retrieve PDF." });
   }
 });
-
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
