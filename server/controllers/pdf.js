@@ -3,76 +3,123 @@ const path = require("path");
 const validUrl = require("valid-url");
 const puppeteer = require("puppeteer");
 const PdfModel = require("../models/Pdf");
-const { chromium } = require('playwright');
+const { chromium } = require("playwright");
 
-// module.exports.postpdf = async (req, res) => {
-//   const { url } = req.body;
-//   if (!validUrl.isUri(url)) {
-//     return res.status(400).json({ success: false, message: "Invalid URL." });
-//   }
-//   try {
-//     const browser = await puppeteer.launch({ headless: "new" });
-//     const page = await browser.newPage();
-//     await page.setViewport({ width: 1400, height: 1000 });
-//     await page.emulateMediaType("screen");
-//     await page.goto(url, { waitUntil: "networkidle0" });
-//     await page.waitForTimeout(2000);
-//     const pdfBuffer = await page.pdf({
-//       format: "A4",
-//       margin: { top: "20px", right: "20px", bottom: "20px", left: "20px" },
-//     });
-//     await browser.close();
-//     const pdfPath = path.join(__dirname, "../pdfs", `${Date.now()}.pdf`);
-//     fs.writeFileSync(pdfPath, pdfBuffer);
-//     const pdfModel = new PdfModel({ path: pdfPath });
-//     await pdfModel.save();
-//     const pdfUrl = `/pdfs/${pdfModel._id}`;
-//     res.json({
-//       success: true,
-//       message: "Webpage converted to PDF successfully.",
-//       pdfUrl,
-//     });
-//   } catch (error) {
-//     console.error(error);
-//     res
-//       .status(500)
-//       .json({ success: false, message: "Failed to convert webpage to PDF." });
-//   }
-// };
+const cloudinary = require("cloudinary").v2;
+const multer = require("multer");
+const { CloudinaryStorage } = require("multer-storage-cloudinary");
+
+cloudinary.config({
+  cloud_name: process.env.CLOUD_NAME,
+  api_key: process.env.API_KEY,
+  api_secret: process.env.API_SECRET,
+});
+const storage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: "pdfs",
+  },
+});
+const upload = multer({ storage: storage }).single("file");
 
 module.exports.postpdf = async (req, res) => {
   const { url } = req.body;
-
+  if (!validUrl.isUri(url)) {
+    return res.status(400).json({ success: false, message: "Invalid URL." });
+  }
   try {
-    const browser = await chromium.launch();
+    const browser = await puppeteer.launch({ headless: "new" });
     const page = await browser.newPage();
-    await page.goto(url, { waitUntil: 'networkidle0' });
-    const imagePath = path.join(__dirname, "../pdfs", `${Date.now()}.png`);
-    await page.screenshot({ path: imagePath, fullPage: true });         
+    await page.setViewport({ width: 1400, height: 1000 });
+    await page.emulateMediaType("screen");
+    await page.goto(url, { waitUntil: "networkidle0" });
     await page.waitForTimeout(2000);
-    const pdfPath =path.join(__dirname, "../pdfs", `${Date.now()}.pdf`);
     const pdfBuffer = await page.pdf({
-      format: 'A4', 
-      margin: { top: '20px', right: '20px', bottom: '20px', left: '20px' },  
+      format: "A4",
+      margin: { top: "20px", right: "20px", bottom: "20px", left: "20px" },
     });
-    fs.writeFileSync(pdfPath, pdfBuffer);
-
     await browser.close();
-
+    const pdfPath = path.join(__dirname, "../pdfs", `${Date.now()}.pdf`);
+    fs.writeFileSync(pdfPath, pdfBuffer);
+    const pdfModel = new PdfModel({ path: pdfPath });
+    await pdfModel.save();
+    const pdfUrl = `/pdfs/${pdfModel._id}`;
     res.json({
       success: true,
-      message: "Webpage converted to PDF and image successfully.",
-      pdfPath,
-      imagePath,
+      message: "Webpage converted to PDF successfully.",
+      pdfUrl,
     });
   } catch (error) {
     console.error(error);
     res
       .status(500)
-      .json({
-        success: false,
-        message: "Failed to convert webpage to PDF and image.",
-      });
+      .json({ success: false, message: "Failed to convert webpage to PDF." });
+  }
+};
+
+module.exports.postImage = async (req, res) => {
+  const { url } = req.body;
+
+  try {
+    const browser = await chromium.launch();
+    const page = await browser.newPage();
+    await page.goto(url, { waitUntil: "networkidle0" });
+    const screenshot = await page.screenshot({ fullPage: true });
+    await browser.close();
+
+    cloudinary.uploader
+      .upload_stream(
+        {
+          resource_type: "image",
+          folder: "pdfs",
+          public_id: "unique_public_id",
+        },
+        (error, result) => {
+          if (error) {
+            console.error("Error uploading image:", error);
+          } else {
+            PdfModel.create({ path: result.secure_url });
+            PdfModel.save().then((data) => {
+              res.status(201).json({
+                success: true,
+                message: "Webpage converted to image successfully.",
+                imagePaht:`/pdfs/${data._id}/download`,
+              });
+            });
+          }
+        }
+      )
+      .end(screenshot);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to convert webpage to PDF and image.",
+    });
+  }
+};
+
+module.exports.getImage = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const pdfModel = await PdfModel.findById(id);
+    if (!pdfModel) {
+      return res
+        .status(404)
+        .json({ success: false, message: "PDF not found." });
+    }
+    const pdfPath = pdfModel.path;
+    // Set the response headers for downloading
+    res.setHeader("Content-Disposition", `attachment; filename=converted.pdf`);
+    res.setHeader("Content-Type", "application/pdf");
+    // Send the PDF file as a stream
+    const stream = fs.createReadStream(pdfPath);
+    stream.pipe(res);
+  } catch (error) {
+    console.error(error);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to retrieve PDF." });
   }
 };
 
