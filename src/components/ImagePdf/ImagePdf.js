@@ -40,7 +40,7 @@ const ImagePdf = () => {
           <a
             className="text-sky-500"
             href={ImageUrl}
-            download="screenshot.png"
+            download="screenshot.jpg"
             target="_blank"
             rel="noopener noreferrer"
           >

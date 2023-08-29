@@ -9,8 +9,6 @@ const PORT = process.env.PORT || 3001;
 const pdfrouter = require("./routes/pdf");
 
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static(__dirname));
-
 app.use(express.json());
 app.use(cors());
 

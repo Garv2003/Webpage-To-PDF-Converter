@@ -33,7 +33,6 @@ module.exports.postpdf = async (req, res) => {
     await page.setViewport({ width: 1400, height: 1000 });
     await page.emulateMediaType("screen");
     await page.goto(url, { waitUntil: "networkidle0" });
-    await page.waitForTimeout(2000);
     const pdfBuffer = await page.pdf({
       format: "A4",
       margin: { top: "20px", right: "20px", bottom: "20px", left: "20px" },
@@ -57,6 +56,30 @@ module.exports.postpdf = async (req, res) => {
   }
 };
 
+module.exports.getpdf = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const pdfModel = await PdfModel.findById(id);
+    if (!pdfModel) {
+      return res
+        .status(404)
+        .json({ success: false, message: "PDF not found." });
+    }
+    const pdfPath = pdfModel.path;
+    // Set the response headers for downloading
+    res.setHeader("Content-Disposition", `attachment; filename=converted.pdf`);
+    res.setHeader("Content-Type", "application/pdf");
+    // Send the PDF file as a stream
+    const stream = fs.createReadStream(pdfPath);
+    stream.pipe(res);
+  } catch (error) {
+    console.error(error);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to retrieve PDF." });
+  }
+};
+
 module.exports.postImage = async (req, res) => {
   const { url } = req.body;
 
@@ -72,18 +95,25 @@ module.exports.postImage = async (req, res) => {
         {
           resource_type: "image",
           folder: "pdfs",
-          public_id: "unique_public_id",
+          // public_id: "unique_public",
         },
         (error, result) => {
           if (error) {
             console.error("Error uploading image:", error);
           } else {
-            PdfModel.create({ path: result.secure_url });
-            PdfModel.save().then((data) => {
+            const newPdfModel = new PdfModel({
+              path: result.secure_url,
+            });
+            newPdfModel.save().then((data) => {
+              const publicId = "654ggdhdsbv";
+              const downloadUrl = cloudinary.url(publicId, {
+                secure: true,
+              });
+              console.log(downloadUrl)
               res.status(201).json({
                 success: true,
                 message: "Webpage converted to image successfully.",
-                imagePaht:`/pdfs/${data._id}/download`,
+                imagePath:downloadUrl
               });
             });
           }
@@ -123,7 +153,40 @@ module.exports.getImage = async (req, res) => {
   }
 };
 
-module.exports.getpdf = async (req, res) => {
+module.exports.postHtml=async (req, res) => {
+  const { htmlContent } = req.body;
+  if (!htmlContent) {
+    return res.status(400).json({ success: false, message: 'HTML content is required.' });
+  }
+
+  try {
+    const browser = await puppeteer.launch({ headless: 'new' });
+    const page = await browser.newPage();
+    await page.setContent(htmlContent, { waitUntil: 'domcontentloaded' });
+    const pdfBuffer = await page.pdf();
+    await browser.close();
+    const cloudinaryUpload = await cloudinary.uploader.upload_stream({}, (error, result) => {
+      if (error) {
+        console.error(error);
+        return res.status(500).json({ success: false, message: 'Failed to upload PDF to Cloudinary.' });
+      }
+
+      // Store the Cloudinary URL in MongoDB
+      const pdfModel = new PdfModel({ cloudinaryUrl: result.secure_url });
+      pdfModel.save();
+
+      // Construct the PDF download URL
+      const pdfUrl = `/pdfs/${pdfModel._id}`;
+
+      res.json({ success: true, message: 'HTML content converted to PDF successfully.', pdfUrl });
+    }).end(pdfBuffer);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Failed to convert HTML content to PDF.' });
+  }
+}
+
+module.exports.getHtml = async (req, res) => {
   const { id } = req.params;
   try {
     const pdfModel = await PdfModel.findById(id);
@@ -133,12 +196,16 @@ module.exports.getpdf = async (req, res) => {
         .json({ success: false, message: "PDF not found." });
     }
     const pdfPath = pdfModel.path;
-    // Set the response headers for downloading
-    res.setHeader("Content-Disposition", `attachment; filename=converted.pdf`);
-    res.setHeader("Content-Type", "application/pdf");
-    // Send the PDF file as a stream
-    const stream = fs.createReadStream(pdfPath);
-    stream.pipe(res);
+    // res.setHeader("Content-Disposition", `attachment; filename=converted.pdf`);
+    // res.setHeader("Content-Type", "application/pdf");
+    // const stream = fs.createReadStream(pdfPath);
+    // stream.pipe(res);
+    const publicId = "your_public_id";
+    const downloadUrl = cloudinary.url(publicId, {
+      type: "fetch",
+      fetch_format: "auto",
+      secure: true,
+    });
   } catch (error) {
     console.error(error);
     res
@@ -147,45 +214,64 @@ module.exports.getpdf = async (req, res) => {
   }
 };
 
-// app.post('/convert', async (req, res) => {
-//   const { htmlContent } = req.body;
 
-//   // Ensure that the HTML content is provided
-//   if (!htmlContent) {
-//     return res.status(400).json({ success: false, message: 'HTML content is required.' });
-//   }
+module.exports.postHtmlImage=async (req, res) => {
+  const { htmlContent } = req.body;
+  if (!htmlContent) {
+    return res.status(400).json({ success: false, message: 'HTML content is required.' });
+  }
 
-//   try {
-//     const browser = await puppeteer.launch({ headless: 'new' });
-//     const page = await browser.newPage();
+  try {
+    const browser = await puppeteer.launch({ headless: 'new' });
+    const page = await browser.newPage();
+    await page.setContent(htmlContent, { waitUntil: 'domcontentloaded' });
+    const pdfBuffer = await page.pdf();
+    await browser.close();
+    const cloudinaryUpload = await cloudinary.uploader.upload_stream({}, (error, result) => {
+      if (error) {
+        console.error(error);
+        return res.status(500).json({ success: false, message: 'Failed to upload PDF to Cloudinary.' });
+      }
 
-//     // Set the HTML content to the page
-//     await page.setContent(htmlContent, { waitUntil: 'domcontentloaded' });
+      // Store the Cloudinary URL in MongoDB
+      const pdfModel = new PdfModel({ cloudinaryUrl: result.secure_url });
+      pdfModel.save();
 
-//     // Generate the PDF from the HTML content
-//     const pdfBuffer = await page.pdf();
+      // Construct the PDF download URL
+      const pdfUrl = `/pdfs/${pdfModel._id}`;
 
-//     // Close the browser
-//     await browser.close();
+      res.json({ success: true, message: 'HTML content converted to PDF successfully.', pdfUrl });
+    }).end(pdfBuffer);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Failed to convert HTML content to PDF.' });
+  }
+}
 
-//     // Upload the PDF to Cloudinary
-//     const cloudinaryUpload = await cloudinary.uploader.upload_stream({}, (error, result) => {
-//       if (error) {
-//         console.error(error);
-//         return res.status(500).json({ success: false, message: 'Failed to upload PDF to Cloudinary.' });
-//       }
-
-//       // Store the Cloudinary URL in MongoDB
-//       const pdfModel = new PdfModel({ cloudinaryUrl: result.secure_url });
-//       pdfModel.save();
-
-//       // Construct the PDF download URL
-//       const pdfUrl = `/pdfs/${pdfModel._id}`;
-
-//       res.json({ success: true, message: 'HTML content converted to PDF successfully.', pdfUrl });
-//     }).end(pdfBuffer);
-//   } catch (error) {
-//     console.error(error);
-//     res.status(500).json({ success: false, message: 'Failed to convert HTML content to PDF.' });
-//   }
-// });
+module.exports.getHtmlImage= async (req, res) => {
+  const { id } = req.params;
+  try {
+    const pdfModel = await PdfModel.findById(id);
+    if (!pdfModel) {
+      return res
+        .status(404)
+        .json({ success: false, message: "PDF not found." });
+    }
+    const pdfPath = pdfModel.path;
+    // res.setHeader("Content-Disposition", `attachment; filename=converted.pdf`);
+    // res.setHeader("Content-Type", "application/pdf");
+    // const stream = fs.createReadStream(pdfPath);
+    // stream.pipe(res);
+    const publicId = "your_public_id";
+    const downloadUrl = cloudinary.url(publicId, {
+      type: "fetch",
+      fetch_format: "auto",
+      secure: true,
+    });
+  } catch (error) {
+    console.error(error);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to retrieve PDF." });
+  }
+};
