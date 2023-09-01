@@ -6,7 +6,7 @@ router.post("/convert", controller.postpdf);
 router.get("/pdfs/:id/download",controller.getpdf);
 
 router.post("/convertImage", controller.postImage);
-router.get("/webimages/:id/download",controller.getImage);
+router.get("/webimage/:id/download",controller.getImage);
 
 router.post("/convertHtml", controller.postHtml);
 router.get("/htmlpdf/:id/download",controller.getHtml);

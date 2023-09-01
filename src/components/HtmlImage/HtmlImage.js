@@ -23,9 +23,9 @@ const HtmlImage = () => {
   return (
     <div className="flex justify-center justify-items-center">
       <div className="text-2xl absolute top-1/4">Convert Web to PDF</div>
-      <div className="flex flex-row absolute top-1/3 w-4/12 ">
+      <div className="flex flex-row absolute top-1/3 w-4/12 shadow-2xl shadow-sky-600">
         <textarea
-          className="rounded-l-lg w-full py-2 px-11 border-2 w-9/12 border-sky-500 focus:outline-none focus:border-sky-500"
+         className="rounded-l-lg w-full py-2 px-11 border-2 w-9/12 border-sky-500 focus:outline-none focus:border-sky-500"
           type="text"
           placeholder="www.example.com"
           value={url}

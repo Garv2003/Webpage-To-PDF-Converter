@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import axios from "axios";
+import { Link } from "react-router-dom";
 const ImagePdf = () => {
   const [url, setUrl] = useState("");
   const [ImageUrl, setImageUrl] = useState("");
@@ -23,7 +24,7 @@ const ImagePdf = () => {
   return (
     <div className="flex justify-center justify-items-center">
       <div className="text-2xl absolute top-1/4">Convert Web to Image</div>
-      <div className="flex flex-row absolute top-1/3 w-4/12 shadow-2xl shadow-gray-400">
+      <div className="flex flex-row absolute top-1/3 w-4/12 shadow-2xl shadow-sky-600">
         <input
           className="rounded-l-lg w-full py-2 px-11 border-2 w-9/12 border-sky-500 focus:outline-none focus:border-sky-500"
           type="text"
@@ -37,15 +38,15 @@ const ImagePdf = () => {
       {ImageUrl && (
         <div className="absolute top-2/4 text-center">
           <p>Click below to download the Image:</p>
-          <a
+          <Link
             className="text-sky-500"
-            href={ImageUrl}
+            to={`http://localhost:3001${ImageUrl}`}
             download="screenshot.jpg"
             target="_blank"
             rel="noopener noreferrer"
           >
             Download Image
-          </a>
+          </Link>
         </div>
       )}
     </div>

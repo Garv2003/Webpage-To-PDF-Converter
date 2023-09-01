@@ -23,7 +23,7 @@ const Body = () => {
   return (
     <div className="flex justify-center justify-items-center">
       <div className="text-2xl absolute top-1/4">Convert Web to PDF</div>
-      <div className="flex flex-row absolute top-1/3 w-4/12 shadow-2xl shadow-gray-400">
+      <div className="flex flex-row absolute top-1/3 w-4/12 shadow-2xl shadow-sky-600">
         <input
           className="rounded-l-lg w-full py-2 px-11 border-2 w-9/12 border-sky-500 focus:outline-none focus:border-sky-500"
           type="text"
@@ -39,7 +39,7 @@ const Body = () => {
           <p>Click below to download the PDF:</p>
           <a
             className="text-sky-500"
-            href={pdfUrl}
+            href={`http://localhost:3001${pdfUrl}`}
             download="converted.pdf"
             target="_blank"
             rel="noopener noreferrer"
