@@ -8,11 +8,14 @@ const ImagePdf = () => {
 
   const convertToImage = async () => {
     try {
-      const response = await axios.post("http://localhost:3001/convertImage", {
-        url,
-      });
+      const response = await axios.post(
+        "http://localhost:3001/convert/?type=image",
+        {
+          url,
+        }
+      );
       setMessage(response.data.message);
-      setImageUrl(response.data.imagePath);
+      setImageUrl(response.data.filePath);
       setUrl("");
       console.log(response.data);
     } catch (error) {
@@ -32,7 +35,12 @@ const ImagePdf = () => {
           value={url}
           onChange={(e) => setUrl(e.target.value)}
         />
-        <button className="bg-sky-500 text-white p-2 px-0 rounded-r-lg w-3/12 focus:outline-none focus:border-sky-500" onClick={convertToImage}>Convert</button>
+        <button
+          className="bg-sky-500 text-white p-2 px-0 rounded-r-lg w-3/12 focus:outline-none focus:border-sky-500"
+          onClick={convertToImage}
+        >
+          Convert
+        </button>
       </div>
       <p className="absolute top-96">{message}</p>
       {ImageUrl && (
@@ -40,7 +48,7 @@ const ImagePdf = () => {
           <p>Click below to download the Image:</p>
           <Link
             className="text-sky-500"
-            to={`http://localhost:3001${ImageUrl}`}
+            to={ImageUrl}
             download="screenshot.jpg"
             target="_blank"
             rel="noopener noreferrer"

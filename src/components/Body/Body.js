@@ -7,11 +7,12 @@ const Body = () => {
 
   const convertToPDF = async () => {
     try {
-      const response = await axios.post("http://localhost:3001/convert", {
+      const response = await axios.post("http://localhost:3001/convert/?type=pdf", {
         url,
       });
       setMessage(response.data.message);
-      setPdfUrl(response.data.pdfPath);
+      setPdfUrl(response.data.filePath);
+      console.log(response.data);
       setUrl("");
       console.log(response.data);
     } catch (error) {
@@ -39,7 +40,7 @@ const Body = () => {
           <p>Click below to download the PDF:</p>
           <a
             className="text-sky-500"
-            href={`http://localhost:3001${pdfUrl}`}
+            href={pdfUrl}
             download="converted.pdf"
             target="_blank"
             rel="noopener noreferrer"
