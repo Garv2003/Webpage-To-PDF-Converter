@@ -8,6 +8,4 @@ router.post("/convert/", controller.postpdfimage);
 
 router.post("/convertHtml", controller.postHtml);
 
-router.post("/convertHtmlImage", controller.postHtmlImage);
-
 module.exports = router;

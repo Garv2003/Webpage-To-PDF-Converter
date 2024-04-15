@@ -103,6 +103,7 @@ module.exports.postHtml = async (req, res) => {
   }
 
   try {
+    let DataBuffer;
     const browser = await puppeteer.launch({ headless: "new" });
     const page = await browser.newPage();
     await page.setContent(htmlContent, { waitUntil: "domcontentloaded" });
@@ -112,7 +113,7 @@ module.exports.postHtml = async (req, res) => {
         margin: { top: "20px", right: "20px", bottom: "20px", left: "20px" },
       });
     } else {
-      const screenshot = await page.screenshot({ fullPage: true });
+      DataBuffer= await page.screenshot({ fullPage: true });
     }
     await browser.close();
     // const cloudinaryUpload = await cloudinary.uploader
@@ -140,54 +141,26 @@ module.exports.postHtml = async (req, res) => {
     //   })
     //   .end(pdfBuffer);
 
-    const pdfPath = path.join(__dirname, "../pdfs", `${Date.now()}.pdf`);
-    fs.writeFileSync(pdfPath, pdfBuffer);
-    const pdfModel = new PdfModel({ path: pdfPath });
+    const filePath = path.join(
+      __dirname,
+      "../pdfs",
+      `${Date.now()}.${type === "pdf" ? "pdf" : "jpg"}`
+    );
+    fs.writeFileSync(filePath, DataBuffer);
+    const pdfModel = new PdfModel({ path: filePath });
     await pdfModel.save();
     const pdfUrl = `http://localhost:3001/download/${pdfModel._id}/?type=${type}`;
     res.json({
       success: true,
-      message: "HTML converted to PDF successfully.",
+      message: `HTML converted to ${type} successfully.`,
       pdfPath: pdfUrl,
     });
   } catch (error) {
     console.error(error);
     res.status(500).json({
       success: false,
-      message: "Failed to convert HTML content to PDF.",
+      message: `Failed to convert HTML content to ${type}.`,
     });
   }
 };
 
-module.exports.postHtmlImage = async (req, res) => {
-  const { htmlContent } = req.body;
-  if (!htmlContent) {
-    return res
-      .status(400)
-      .json({ success: false, message: "HTML content is required." });
-  }
-
-  try {
-    const browser = await puppeteer.launch({ headless: "new" });
-    const page = await browser.newPage();
-    await page.setContent(htmlContent, { waitUntil: "domcontentloaded" });
-    const screenshot = await page.screenshot({ fullPage: true });
-    await browser.close();
-    const pdfPath = path.join(__dirname, "../pdfs", `${Date.now()}.jpg`);
-    fs.writeFileSync(pdfPath, screenshot);
-    const pdfModel = new PdfModel({ path: pdfPath });
-    await pdfModel.save();
-    const pdfUrl = `http://localhost:3001/downloadImages/${pdfModel._id}/?type=image`;
-    res.json({
-      success: true,
-      message: "HTML converted to Image successfully.",
-      pdfPath: pdfUrl,
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to convert HTML content to PDF.",
-    });
-  }
-};
